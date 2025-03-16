@@ -15,43 +15,22 @@
         "viewsContainers": {
             "activitybar": [
                 {
-                    "id": "calicoColors",
-                    "title": "Calico Colors",
+                    "id": "tutor",
+                    "title": "Tutor",
                     "icon": "media/icon.svg"
                 }
             ]
         },
         "views": {
-            "calicoColors": [
+            "tutor": [
                 {
                     "type": "webview",
-                    "id": "calicoColors.colorsView",
-                    "name": "Colors"
+                    "id": "tutor.chat",
+                    "name": "Tutor Chat"
                 }
             ]
         },
-        "commands": [
-            {
-                "command": "calicoColors.addColor",
-                "category": "Calico Colors",
-                "title": "Add Color"
-            },
-            {
-                "command": "calicoColors.clearColors",
-                "category": "Calico Colors",
-                "title": "Clear Colors",
-                "icon": "$(clear-all)"
-            }
-        ],
-        "menus": {
-            "view/title": [
-                {
-                    "command": "calicoColors.clearColors",
-                    "group": "navigation",
-                    "when": "view == calicoColors.colorsView"
-                }
-            ]
-        }
+        "commands": []
     },
     "scripts": {
         "vscode:prepublish": "npm run compile",
