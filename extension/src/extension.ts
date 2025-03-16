@@ -51,36 +51,28 @@ class ColorsViewProvider implements vscode.WebviewViewProvider {
         try {
             const session = await vscode.authentication.getSession(
                 "github",
-                ["read:user"],
+                ["read:user", "user:email"],
                 { createIfNone: true }
             );
-            const verifyResponse = await fetch(
-                "http://localhost:3000/verify-token",
+            const response = await fetch(
+                "http://localhost:3000/chat/message",
                 {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
+                        "Authorization": `Bearer ${session.accessToken}`,
                     },
-                    body: JSON.stringify({ token: session.accessToken }),
+                    body: JSON.stringify({ message: message }),
                 }
             );
+            console.log("Response:", response);
 
-            if (!verifyResponse.ok) {
+            if (!response.ok) {
                 throw new Error("Token verification failed");
             }
 
-            const response = await fetch(
-                "https://jsonplaceholder.typicode.com/posts/1",
-                {
-                    method: "GET",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${session.accessToken}`,
-                    },
-                }
-            );
             const data = (await response.json()) as any;
-            return data.title;
+            return data.chatResponse;
         } catch (error) {
             console.error("Error:", error);
             throw error;
