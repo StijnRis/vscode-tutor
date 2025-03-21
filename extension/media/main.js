@@ -1,4 +1,3 @@
-//@ts-check
 
 // This script will be run within the webview itself
 // It cannot access the main VS Code APIs directly.
@@ -13,14 +12,19 @@
         const message = messageInput.value;
         if (message) {
             const messageElement = document.createElement("div");
+            messageElement.className = "message";
             messageElement.textContent = "You: " + message;
             messagesDiv.appendChild(messageElement);
 
             const loadingElement = document.createElement("div");
+            loadingElement.className = "message";
             loadingElement.textContent = "loading...";
             messagesDiv.appendChild(loadingElement);
 
             vscode.postMessage({ command: "getResponse", text: message });
+
+            // Clear the text field
+            messageInput.value = "";
         }
     });
 
@@ -30,7 +34,8 @@
             case "response":
                 const loadingElement =
                     messagesDiv.querySelector("div:last-child");
-                loadingElement.textContent = message.text;
+                loadingElement.innerHTML = message.text;
+
                 break;
         }
     });

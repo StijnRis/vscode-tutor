@@ -54,17 +54,14 @@ class ColorsViewProvider implements vscode.WebviewViewProvider {
                 ["read:user", "user:email"],
                 { createIfNone: true }
             );
-            const response = await fetch(
-                "http://localhost:3000/chat/message",
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${session.accessToken}`,
-                    },
-                    body: JSON.stringify({ message: message }),
-                }
-            );
+            const response = await fetch("http://localhost:3000/chat/message", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${session.accessToken}`,
+                },
+                body: JSON.stringify({ message: message }),
+            });
             console.log("Response:", response);
 
             if (!response.ok) {
@@ -124,8 +121,8 @@ class ColorsViewProvider implements vscode.WebviewViewProvider {
             <div id="chat">
                 <div id="messages"></div>
                 <div id="input-container">
-                    <input id="message-input" type="text" placeholder="Type a message...">
-                    <button id="send-button">Send</button>
+                    <textarea id="message-input" placeholder="Type a message..."></textarea>
+                    <button id="send-button"><svg class="" focusable="false" aria-hidden="true" viewBox="0 0 24 24" data-testid="SendIcon"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z" fill="white"></path></svg></button>
                 </div>
             </div>
 

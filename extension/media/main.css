@@ -1,71 +1,48 @@
 body {
-    background-color: transparent;
-}
-
-.color-list {
-    list-style: none;
-    padding: 0;
-}
-
-.color-entry {
-    width: 100%;
-    display: flex;
-    margin-bottom: 0.4em;
-    border: 1px solid var(--vscode-input-border);
-}
-
-.color-preview {
-    width: 2em;
-    height: 2em;
-}
-
-.color-preview:hover {
-    outline: inset white;
-}
-
-.color-input {
-    display: block;
-    flex: 1;
-    width: 100%;
-    color: var(--vscode-input-foreground);
-    background-color: var(--vscode-input-background);
-    border: none;
-    padding: 0 0.6em;
-}
-
-.add-color-button {
-    display: block;
-    border: none;
-    margin: 0 auto;
-}
-
-body {
     display: flex;
     flex-direction: column;
     height: 100vh;
     margin: 0;
+    padding: 0;
+    background-color: transparent;
 }
+
 #chat {
     display: flex;
     flex-direction: column;
     flex-grow: 1;
     overflow: hidden;
 }
+
 #messages {
     flex-grow: 1;
     overflow-y: auto;
-    padding: 10px;
 }
+
+.message {
+    padding: 5px;
+    border-bottom: 1px solid #ccc;
+    word-wrap: break-word;
+    font-size: 15px;
+}
+
 #input-container {
     display: flex;
-    padding: 10px;
     border-top: 1px solid #ccc;
 }
+
 #message-input {
     flex-grow: 1;
     padding: 5px;
+    resize: none;
+    overflow-y: auto;
+    height: auto;
+    max-height: 100px;
 }
+
 #send-button {
-    margin-left: 10px;
-    padding: 5px 10px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    width: 30px;
 }
