@@ -1,17 +1,80 @@
+import * as fs from "fs";
+import * as path from "path";
 import * as vscode from "vscode";
 
+const userName = require("os").userInfo().username;
+
 export function activate(context: vscode.ExtensionContext) {
-    const provider = new ColorsViewProvider(context.extensionUri);
+    console.log("Activating Tutor extension");
+    const provider = new ChatViewProvider(context.extensionUri);
+
+    const userFolderPath = setupFolder(userName);
 
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(
-            ColorsViewProvider.viewType,
+            ChatViewProvider.viewType,
             provider
         )
     );
+    context.subscriptions.push(
+        vscode.window.onDidEndTerminalShellExecution(event => {
+            const terminal = event.terminal;
+            console.log(`Terminal '${terminal.name}' finished execution.`);
+            saveTerminalResults(userFolderPath)
+        })
+    );
 }
 
-class ColorsViewProvider implements vscode.WebviewViewProvider {
+export function setupFolder(user: string) {
+    const dataFolderPath = path.join(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '', '.data');
+    if (!fs.existsSync(dataFolderPath)) {
+        fs.mkdirSync(dataFolderPath);
+        console.log(`Created .data folder at: ${dataFolderPath}`);
+    } else {
+        console.log(`.data folder already exists at: ${dataFolderPath}`);
+    }
+
+    const userFolderPath = path.join(dataFolderPath, user);
+    if (!fs.existsSync(userFolderPath)) {
+        fs.mkdirSync(userFolderPath);
+        console.log(`Created user folder at: ${userFolderPath}`);
+    } else {
+        console.log(`User folder already exists at: ${userFolderPath}`);
+    }
+
+    return userFolderPath
+}
+
+async function saveTerminalResults(userFolderPath: string) {
+    // Save the original clipboard content
+    const originalClipboardContent = await vscode.env.clipboard.readText();
+
+    // Select all text in the terminal
+    await vscode.commands.executeCommand('workbench.action.terminal.selectAll');
+    
+    // Copy the selected text from the terminal
+    await vscode.commands.executeCommand('workbench.action.terminal.copySelection');
+
+    // Clear selection
+    await vscode.commands.executeCommand('workbench.action.terminal.clearSelection');
+    
+    // Retrieve the copied content from the clipboard
+    const clipboardContent = await vscode.env.clipboard.readText();
+
+    // Restore the original clipboard content
+    await vscode.env.clipboard.writeText(originalClipboardContent);
+
+    // Get most recent program execution
+    const program = clipboardContent.split('\nPS').slice(-2, -1)[0];
+
+    // Save the copied content to a file
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filePath = path.join(userFolderPath, `terminal-output-${timestamp}.txt`);
+    fs.writeFileSync(filePath, program);
+    console.log('Terminal output saved to:', filePath);
+}
+
+class ChatViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = "tutor.chat";
 
     private _view?: vscode.WebviewView;
@@ -72,7 +135,7 @@ class ColorsViewProvider implements vscode.WebviewViewProvider {
             return data.chatResponse;
         } catch (error) {
             console.error("Error:", error);
-            throw error;
+            return "An error occurred: " + error;
         }
     }
 
