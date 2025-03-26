@@ -16,10 +16,13 @@ export async function activate(context: vscode.ExtensionContext) {
     output.appendLine("Activating Tutor extension");
     output.appendLine(`Username found: ${await userName}`);
 
-    const provider = new ChatViewProvider(context.extensionUri);
-    
+    vscode.window.showInformationMessage(
+        `Telemetry logging to a local file is enabled for research purposes.`
+    );
+
     const userFolderPath = setupFolder(await userName);
 
+    const provider = new ChatViewProvider(context.extensionUri);
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(
             ChatViewProvider.viewType,
@@ -27,7 +30,7 @@ export async function activate(context: vscode.ExtensionContext) {
         )
     );
     context.subscriptions.push(
-        vscode.window.onDidEndTerminalShellExecution((event) => {
+        vscode.window.onDidStartTerminalShellExecution(async (event) => {
             saveExecution(userFolderPath, event);
         })
     );
@@ -41,10 +44,10 @@ async function getUserName() {
     const response = await fetch("https://api.github.com/user", {
         headers: {
             Authorization: `Bearer ${(await session).accessToken}`,
-            "User-Agent": "vscode-extension"
-        }
+            "User-Agent": "vscode-extension",
+        },
     });
-    const data = await response.json() as any;
+    const data = (await response.json()) as any;
     return data.login;
 }
 
@@ -71,61 +74,41 @@ function setupFolder(user: string) {
     return userFolderPath;
 }
 
-async function saveExecution(userFolderPath: string, event: vscode.TerminalShellExecutionEndEvent) {
+async function saveExecution(
+    userFolderPath: string,
+    event: vscode.TerminalShellExecutionStartEvent
+) {
     const terminal = event.terminal;
     const command = event.execution.commandLine.value;
     output.appendLine(
-        `Terminal '${terminal.name}' finished executing command: ${command}`
+        `Terminal '${terminal.name}' started executing command: ${command}`
     );
 
-    const result = await getTerminalResults(command);
+    let result = "";
+    const stream = event.execution.read()
+    for await (const data of stream) {
+        result += data;
+    }
 
-    const shortenedResult = result.replace(/\r?\n|\r/g, "").length > 14 
-        ? `${result.replace(/\r?\n|\r/g, "").slice(0, 7)}...${result.replace(/\r?\n|\r/g, "").slice(-7)}` 
-        : result.replace(/\r?\n|\r/g, "");
+    const shortenedResult =
+        result.replace(/\r?\n|\r/g, "").length > 14
+            ? `${result.replace(/\r?\n|\r/g, "").slice(0, 7)}...${result
+                  .replace(/\r?\n|\r/g, "")
+                  .slice(-7)}`
+            : result.replace(/\r?\n|\r/g, "");
     output.appendLine(`Terminal output found: '${shortenedResult}'`);
 
     const data = {
-        "timestamp": new Date().toISOString(),
-        "user": await userName,
-        "command": command,
-        "result": result,
-        "exit_code": event.exitCode
-    }
+        timestamp: new Date().toISOString(),
+        user: await userName,
+        command: command,
+        result: result,
+    };
 
-    const filePath = path.join(userFolderPath, "runs.json")
-    fs.appendFileSync(filePath, JSON.stringify(data, null, 2)+",\n");
+    const filePath = path.join(userFolderPath, "runs.json");
+    fs.appendFileSync(filePath, JSON.stringify(data, null, 2) + ",\n");
 
     output.appendLine(`Terminal output saved to: ${filePath}`);
-}
-
-async function getTerminalResults(command: string) {
-    // Save the original clipboard content
-    const originalClipboardContent = await vscode.env.clipboard.readText();
-
-    // Select all text in the terminal
-    await vscode.commands.executeCommand("workbench.action.terminal.selectAll");
-
-    // Copy the selected text from the terminal
-    await vscode.commands.executeCommand(
-        "workbench.action.terminal.copySelection"
-    );
-
-    // Clear selection
-    await vscode.commands.executeCommand(
-        "workbench.action.terminal.clearSelection"
-    );
-
-    // Retrieve the copied content from the clipboard
-    const clipboardContent = await vscode.env.clipboard.readText();
-
-    // Restore the original clipboard content
-    await vscode.env.clipboard.writeText(originalClipboardContent);
-
-    // Get most recent program execution
-    const output = clipboardContent.split(command).pop() || "";
-
-    return output;
 }
 
 class ChatViewProvider implements vscode.WebviewViewProvider {
