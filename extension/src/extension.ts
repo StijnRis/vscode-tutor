@@ -31,7 +31,7 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     context.subscriptions.push(
         vscode.window.onDidStartTerminalShellExecution(async (event) => {
-            saveExecution(userFolderPath, event);
+            saveExecutionEvent(userFolderPath, event);
         })
     );
 }
@@ -63,18 +63,18 @@ function setupFolder(user: string) {
         output.appendLine(`.data folder already exists at: ${dataFolderPath}`);
     }
 
-    const userFolderPath = path.join(dataFolderPath, user);
+    const userFolderPath = path.join(dataFolderPath, user, vscode.env.machineId, vscode.env.sessionId);
     if (!fs.existsSync(userFolderPath)) {
-        fs.mkdirSync(userFolderPath);
-        output.appendLine(`Created user folder at: ${userFolderPath}`);
+        fs.mkdirSync(userFolderPath, { recursive: true });
+        output.appendLine(`Created session folder at: ${userFolderPath}`);
     } else {
-        output.appendLine(`User folder already exists at: ${userFolderPath}`);
+        output.appendLine(`User session already exists at: ${userFolderPath}`);
     }
 
     return userFolderPath;
 }
 
-async function saveExecution(
+async function saveExecutionEvent(
     userFolderPath: string,
     event: vscode.TerminalShellExecutionStartEvent
 ) {
@@ -98,14 +98,19 @@ async function saveExecution(
             : result.replace(/\r?\n|\r/g, "");
     output.appendLine(`Terminal output found: '${shortenedResult}'`);
 
+    
     const data = {
+        eventType: "execution",
         timestamp: new Date().toISOString(),
-        user: await userName,
+        sessionId: vscode.env.sessionId,
+        machineId: vscode.env.machineId,
+        githubUsername: await userName,
+        exitStatus: event.terminal.exitStatus,
         command: command,
         result: result,
     };
 
-    const filePath = path.join(userFolderPath, "runs.json");
+    const filePath = path.join(userFolderPath, "telemetry.json");
     fs.appendFileSync(filePath, JSON.stringify(data, null, 2) + ",\n");
 
     output.appendLine(`Terminal output saved to: ${filePath}`);
