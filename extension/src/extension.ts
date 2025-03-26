@@ -2,13 +2,23 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 
-const userName = require("os").userInfo().username;
+const output = vscode.window.createOutputChannel("Tutor");
 
-export function activate(context: vscode.ExtensionContext) {
-    console.log("Activating Tutor extension");
+const session = vscode.authentication.getSession(
+    "github",
+    ["read:user", "user:email"],
+    { createIfNone: true }
+);
+
+const userName = getUserName();
+
+export async function activate(context: vscode.ExtensionContext) {
+    output.appendLine("Activating Tutor extension");
+    output.appendLine(`Username found: ${await userName}`);
+
     const provider = new ChatViewProvider(context.extensionUri);
-
-    const userFolderPath = setupFolder(userName);
+    
+    const userFolderPath = setupFolder(await userName);
 
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(
@@ -17,47 +27,95 @@ export function activate(context: vscode.ExtensionContext) {
         )
     );
     context.subscriptions.push(
-        vscode.window.onDidEndTerminalShellExecution(event => {
-            const terminal = event.terminal;
-            console.log(`Terminal '${terminal.name}' finished execution.`);
-            saveTerminalResults(userFolderPath)
+        vscode.window.onDidEndTerminalShellExecution((event) => {
+            saveExecution(userFolderPath, event);
         })
     );
 }
 
-export function setupFolder(user: string) {
-    const dataFolderPath = path.join(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '', '.data');
+export async function deactivate() {
+    output.appendLine("Deactivating Tutor extension");
+}
+
+async function getUserName() {
+    const response = await fetch("https://api.github.com/user", {
+        headers: {
+            Authorization: `Bearer ${(await session).accessToken}`,
+            "User-Agent": "vscode-extension"
+        }
+    });
+    const data = await response.json() as any;
+    return data.login;
+}
+
+function setupFolder(user: string) {
+    const dataFolderPath = path.join(
+        vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || "",
+        ".data"
+    );
     if (!fs.existsSync(dataFolderPath)) {
         fs.mkdirSync(dataFolderPath);
-        console.log(`Created .data folder at: ${dataFolderPath}`);
+        output.appendLine(`Created .data folder at: ${dataFolderPath}`);
     } else {
-        console.log(`.data folder already exists at: ${dataFolderPath}`);
+        output.appendLine(`.data folder already exists at: ${dataFolderPath}`);
     }
 
     const userFolderPath = path.join(dataFolderPath, user);
     if (!fs.existsSync(userFolderPath)) {
         fs.mkdirSync(userFolderPath);
-        console.log(`Created user folder at: ${userFolderPath}`);
+        output.appendLine(`Created user folder at: ${userFolderPath}`);
     } else {
-        console.log(`User folder already exists at: ${userFolderPath}`);
+        output.appendLine(`User folder already exists at: ${userFolderPath}`);
     }
 
-    return userFolderPath
+    return userFolderPath;
 }
 
-async function saveTerminalResults(userFolderPath: string) {
+async function saveExecution(userFolderPath: string, event: vscode.TerminalShellExecutionEndEvent) {
+    const terminal = event.terminal;
+    const command = event.execution.commandLine.value;
+    output.appendLine(
+        `Terminal '${terminal.name}' finished executing command: ${command}`
+    );
+
+    const result = await getTerminalResults(command);
+
+    const shortenedResult = result.replace(/\r?\n|\r/g, "").length > 14 
+        ? `${result.replace(/\r?\n|\r/g, "").slice(0, 7)}...${result.replace(/\r?\n|\r/g, "").slice(-7)}` 
+        : result.replace(/\r?\n|\r/g, "");
+    output.appendLine(`Terminal output found: '${shortenedResult}'`);
+
+    const data = {
+        "timestamp": new Date().toISOString(),
+        "user": await userName,
+        "command": command,
+        "result": result,
+        "exit_code": event.exitCode
+    }
+
+    const filePath = path.join(userFolderPath, "runs.json")
+    fs.appendFileSync(filePath, JSON.stringify(data, null, 2)+",\n");
+
+    output.appendLine(`Terminal output saved to: ${filePath}`);
+}
+
+async function getTerminalResults(command: string) {
     // Save the original clipboard content
     const originalClipboardContent = await vscode.env.clipboard.readText();
 
     // Select all text in the terminal
-    await vscode.commands.executeCommand('workbench.action.terminal.selectAll');
-    
+    await vscode.commands.executeCommand("workbench.action.terminal.selectAll");
+
     // Copy the selected text from the terminal
-    await vscode.commands.executeCommand('workbench.action.terminal.copySelection');
+    await vscode.commands.executeCommand(
+        "workbench.action.terminal.copySelection"
+    );
 
     // Clear selection
-    await vscode.commands.executeCommand('workbench.action.terminal.clearSelection');
-    
+    await vscode.commands.executeCommand(
+        "workbench.action.terminal.clearSelection"
+    );
+
     // Retrieve the copied content from the clipboard
     const clipboardContent = await vscode.env.clipboard.readText();
 
@@ -65,13 +123,9 @@ async function saveTerminalResults(userFolderPath: string) {
     await vscode.env.clipboard.writeText(originalClipboardContent);
 
     // Get most recent program execution
-    const program = clipboardContent.split('\nPS').slice(-2, -1)[0];
+    const output = clipboardContent.split(command).pop() || "";
 
-    // Save the copied content to a file
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filePath = path.join(userFolderPath, `terminal-output-${timestamp}.txt`);
-    fs.writeFileSync(filePath, program);
-    console.log('Terminal output saved to:', filePath);
+    return output;
 }
 
 class ChatViewProvider implements vscode.WebviewViewProvider {
@@ -112,20 +166,15 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
     private async getResponse(message: string): Promise<string> {
         try {
-            const session = await vscode.authentication.getSession(
-                "github",
-                ["read:user", "user:email"],
-                { createIfNone: true }
-            );
             const response = await fetch("http://localhost:3000/chat/message", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${session.accessToken}`,
+                    Authorization: `Bearer ${(await session).accessToken}`,
                 },
                 body: JSON.stringify({ message: message }),
             });
-            console.log("Response:", response);
+            output.appendLine(`Response: ${response}`);
 
             if (!response.ok) {
                 throw new Error("Token verification failed");
