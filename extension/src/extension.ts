@@ -1,6 +1,11 @@
-import * as fs from "fs";
-import * as path from "path";
 import * as vscode from "vscode";
+import { Exporter } from "./exporter/exporter";
+import { FileExporter } from "./exporter/file_exporter";
+import { DocumentCloseEventProducer } from "./producer/document_close_event_producer";
+import { DocumentOpenEventProducer } from "./producer/document_open_event_producer";
+import { DocumentSaveEventProducer } from "./producer/document_save_event_producer";
+import { EventProducer } from "./producer/event_producer";
+import { ExecuteCommandEventProducer } from "./producer/execute_command_event_producer";
 
 const output = vscode.window.createOutputChannel("Tutor");
 
@@ -10,18 +15,35 @@ const session = vscode.authentication.getSession(
     { createIfNone: true }
 );
 
-const userName = getUserName();
-
 export async function activate(context: vscode.ExtensionContext) {
     output.appendLine("Activating Tutor extension");
-    output.appendLine(`Username found: ${await userName}`);
+    const userName = await getUserName();
+    output.appendLine(`Username found: ${userName}`);
 
-    vscode.window.showInformationMessage(
-        `Telemetry logging to a local file is enabled for research purposes.`
-    );
+    // Create producers
+    const producers: EventProducer[] = [];
+    producers.push(new ExecuteCommandEventProducer(output, userName));
+    producers.push(new DocumentCloseEventProducer(output, userName));
+    producers.push(new DocumentOpenEventProducer(output, userName));
+    producers.push(new DocumentSaveEventProducer(output, userName));
 
-    const userFolderPath = setupFolder(await userName);
+    // Create exporters
+    const exporters: Exporter[] = [];
+    exporters.push(FileExporter.create(userName, output));
 
+    // Link producers and exporters
+    for (const producer of producers) {
+        for (const exporter of exporters) {
+            producer.add_exporter(exporter);
+        }
+    }
+
+    // Listen to events
+    for (const producer of producers) {
+        producer.listen(context);
+    }
+
+    // Register chat view
     const provider = new ChatViewProvider(context.extensionUri);
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(
@@ -29,11 +51,12 @@ export async function activate(context: vscode.ExtensionContext) {
             provider
         )
     );
-    context.subscriptions.push(
-        vscode.window.onDidStartTerminalShellExecution(async (event) => {
-            saveExecutionEvent(userFolderPath, event);
-        })
+
+    vscode.window.showInformationMessage(
+        `Telemetry logging to a local file is enabled for research purposes.`
     );
+
+    output.appendLine(`Fully activated Tutor extension`);
 }
 
 export async function deactivate() {
@@ -49,71 +72,6 @@ async function getUserName() {
     });
     const data = (await response.json()) as any;
     return data.login;
-}
-
-function setupFolder(user: string) {
-    const dataFolderPath = path.join(
-        vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || "",
-        ".data"
-    );
-    if (!fs.existsSync(dataFolderPath)) {
-        fs.mkdirSync(dataFolderPath);
-        output.appendLine(`Created .data folder at: ${dataFolderPath}`);
-    } else {
-        output.appendLine(`.data folder already exists at: ${dataFolderPath}`);
-    }
-
-    const userFolderPath = path.join(dataFolderPath, user, vscode.env.machineId, vscode.env.sessionId);
-    if (!fs.existsSync(userFolderPath)) {
-        fs.mkdirSync(userFolderPath, { recursive: true });
-        output.appendLine(`Created session folder at: ${userFolderPath}`);
-    } else {
-        output.appendLine(`User session already exists at: ${userFolderPath}`);
-    }
-
-    return userFolderPath;
-}
-
-async function saveExecutionEvent(
-    userFolderPath: string,
-    event: vscode.TerminalShellExecutionStartEvent
-) {
-    const terminal = event.terminal;
-    const command = event.execution.commandLine.value;
-    output.appendLine(
-        `Terminal '${terminal.name}' started executing command: ${command}`
-    );
-
-    let result = "";
-    const stream = event.execution.read()
-    for await (const data of stream) {
-        result += data;
-    }
-
-    const shortenedResult =
-        result.replace(/\r?\n|\r/g, "").length > 14
-            ? `${result.replace(/\r?\n|\r/g, "").slice(0, 7)}...${result
-                  .replace(/\r?\n|\r/g, "")
-                  .slice(-7)}`
-            : result.replace(/\r?\n|\r/g, "");
-    output.appendLine(`Terminal output found: '${shortenedResult}'`);
-
-    
-    const data = {
-        eventType: "execution",
-        timestamp: new Date().toISOString(),
-        sessionId: vscode.env.sessionId,
-        machineId: vscode.env.machineId,
-        githubUsername: await userName,
-        exitStatus: event.terminal.exitStatus,
-        command: command,
-        result: result,
-    };
-
-    const filePath = path.join(userFolderPath, "telemetry.json");
-    fs.appendFileSync(filePath, JSON.stringify(data, null, 2) + ",\n");
-
-    output.appendLine(`Terminal output saved to: ${filePath}`);
 }
 
 class ChatViewProvider implements vscode.WebviewViewProvider {

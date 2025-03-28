@@ -2,7 +2,7 @@
     "name": "tutor",
     "displayName": "tutor",
     "description": "",
-    "version": "0.2.3",
+    "version": "0.2.5",
     "publisher": "vscodeTutor",
     "engines": {
         "vscode": "^1.98.0"
