@@ -1,15 +1,23 @@
 {
     "name": "tutor",
-    "displayName": "tutor",
-    "description": "",
-    "version": "0.2.5",
+    "displayName": "Tutor",
+    "description": "A tutor that helps you learn programming and making projects.",
+    "version": "0.2.8",
     "publisher": "vscodeTutor",
     "engines": {
         "vscode": "^1.98.0"
     },
+    "author": {
+        "name": "Stijn"
+    },
+    "icon": "media/icon.png",
+    "pricing": "Free",
     "categories": [
-        "Education"
+        "Education",
+        "Chat",
+        "AI"
     ],
+    "license": "SEE LICENSE IN LICENSE",
     "activationEvents": [
         "onStartupFinished"
     ],
@@ -18,6 +26,10 @@
         "type": "git",
         "url": "https://github.com/StijnRis/vscode-tutor.git"
     },
+    "bugs": {
+        "url": "https://github.com/StijnRis/vscode-tutor/issues"
+    },
+    "homepage": "https://github.com/StijnRis/vscode-tutor",
     "contributes": {
         "viewsContainers": {
             "activitybar": [

@@ -9,27 +9,26 @@ import { ExecuteCommandEventProducer } from "./producer/execute_command_event_pr
 
 const output = vscode.window.createOutputChannel("Tutor");
 
-const session = vscode.authentication.getSession(
-    "github",
-    ["read:user", "user:email"],
-    { createIfNone: true }
-);
-
 export async function activate(context: vscode.ExtensionContext) {
     output.appendLine("Activating Tutor extension");
-    const userName = await getUserName();
-    output.appendLine(`Username found: ${userName}`);
+
+    const { accessToken, username } = await setupSession();
+    if (!accessToken) {
+        return;
+    }
+
+    output.appendLine(`Username found: ${username}`);
 
     // Create producers
     const producers: EventProducer[] = [];
-    producers.push(new ExecuteCommandEventProducer(output, userName));
-    producers.push(new DocumentCloseEventProducer(output, userName));
-    producers.push(new DocumentOpenEventProducer(output, userName));
-    producers.push(new DocumentSaveEventProducer(output, userName));
+    producers.push(new ExecuteCommandEventProducer(output, username));
+    producers.push(new DocumentCloseEventProducer(output, username));
+    producers.push(new DocumentOpenEventProducer(output, username));
+    producers.push(new DocumentSaveEventProducer(output, username));
 
     // Create exporters
     const exporters: Exporter[] = [];
-    exporters.push(FileExporter.create(userName, output));
+    exporters.push(FileExporter.create(username, output));
 
     // Link producers and exporters
     for (const producer of producers) {
@@ -44,7 +43,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }
 
     // Register chat view
-    const provider = new ChatViewProvider(context.extensionUri);
+    const provider = new ChatViewProvider(context.extensionUri, accessToken);
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(
             ChatViewProvider.viewType,
@@ -63,15 +62,60 @@ export async function deactivate() {
     output.appendLine("Deactivating Tutor extension");
 }
 
-async function getUserName() {
+async function setupSession() {
+    let session: vscode.AuthenticationSession | undefined | null = null;
+    try {
+        session = await vscode.authentication.getSession(
+            "github",
+            ["read:user", "user:email"]
+        );
+    } catch (error) {
+        output.appendLine("Error during authentication: " + error);
+    }
+
+    if (!session) {
+        vscode.window.showInformationMessage(
+            "In the next popup, please log in to your GitHub account so we can retrieve your email address. We require it to prevent unauthorized access to the chatbot.",
+            { modal: true }
+        );
+        try {
+            session = await vscode.authentication.getSession(
+                "github",
+                ["read:user", "user:email"],
+                { createIfNone: true }
+            );
+        } catch (error) {
+            output.appendLine("Error during authentication: " + error);
+        }
+    }
+
+    if (!session) {
+        const retry = await vscode.window.showInformationMessage(
+            "Failed to authenticate with GitHub. Do you want to retry?",
+            { modal: true },
+            { title: "Yes", isCloseAffordance: false },
+            { title: "No", isCloseAffordance: true }
+        );
+        if (retry && !retry.isCloseAffordance) {
+            return await setupSession();
+        }
+        return {
+            accessToken: null,
+            username: "Unknown",
+        };
+    }
+
     const response = await fetch("https://api.github.com/user", {
         headers: {
-            Authorization: `Bearer ${(await session).accessToken}`,
+            Authorization: `Bearer ${session.accessToken}`,
             "User-Agent": "vscode-extension",
         },
     });
     const data = (await response.json()) as any;
-    return data.login;
+    return {
+        accessToken: session.accessToken,
+        username: data.login,
+    };
 }
 
 class ChatViewProvider implements vscode.WebviewViewProvider {
@@ -79,7 +123,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
     private _view?: vscode.WebviewView;
 
-    constructor(private readonly _extensionUri: vscode.Uri) {}
+    constructor(
+        private readonly _extensionUri: vscode.Uri,
+        private readonly accessToken: string | null
+    ) {}
 
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
@@ -116,7 +163,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${(await session).accessToken}`,
+                    Authorization: `Bearer ${this.accessToken}`,
                 },
                 body: JSON.stringify({ message: message }),
             });
