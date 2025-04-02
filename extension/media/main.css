@@ -21,9 +21,17 @@ body {
 
 .message {
     padding: 5px;
-    border-bottom: 1px solid #ccc;
     word-wrap: break-word;
     font-size: 15px;
+}
+
+.user-message {
+    background-color: #ffffff11;
+    align-self: flex-end;
+}
+
+.bot-message {
+    align-self: flex-start;
 }
 
 #input-container {
@@ -37,7 +45,7 @@ body {
     resize: none;
     overflow-y: auto;
     height: auto;
-    max-height: 100px;
+    min-height: 60px;
 }
 
 #send-button {

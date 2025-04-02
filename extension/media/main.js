@@ -1,4 +1,3 @@
-
 // This script will be run within the webview itself
 // It cannot access the main VS Code APIs directly.
 (function () {
@@ -8,20 +7,23 @@
     const messageInput = document.getElementById("message-input");
     const sendButton = document.getElementById("send-button");
 
+    // Load conversation from chat.json
+    vscode.postMessage({ command: "loadConversation" });
+
     sendButton.addEventListener("click", () => {
         const message = messageInput.value;
         if (message) {
             const messageElement = document.createElement("div");
-            messageElement.className = "message";
+            messageElement.className = "message user-message";
             messageElement.textContent = "You: " + message;
             messagesDiv.appendChild(messageElement);
 
             const loadingElement = document.createElement("div");
-            loadingElement.className = "message";
+            loadingElement.className = "message bot-message";
             loadingElement.textContent = "loading...";
             messagesDiv.appendChild(loadingElement);
 
-            vscode.postMessage({ command: "getResponse", text: message });
+            vscode.postMessage({ command: "sendMessage", text: message });
 
             // Clear the text field
             messageInput.value = "";
@@ -37,6 +39,29 @@
                 loadingElement.innerHTML = message.text;
 
                 break;
+
+            case "loadConversation":
+                const conversation = message.conversation || [];
+                conversation.forEach((msg) => {
+                    const messageElement = document.createElement("div");
+                    messageElement.className = "message " + (msg["isUserMessage"] ? "user-message" : "bot-message");
+                    let message = msg["message"];
+                    if (msg["isUserMessage"]) {
+                        message = "You: " + message;
+                    }
+                    messageElement.innerHTML = message;
+                    messagesDiv.appendChild(messageElement);
+                });
+                break;
         }
+    });
+
+    document.addEventListener("DOMContentLoaded", function() {
+        const textarea = document.getElementById("message-input");
+    
+        textarea.addEventListener("input", function() {
+            this.style.height = "auto"; // Reset height to recalculate
+            this.style.height = Math.min(this.scrollHeight, 200) + "px"; // Adjust height based on scroll height
+        });
     });
 })();

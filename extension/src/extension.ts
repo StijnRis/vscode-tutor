@@ -1,3 +1,5 @@
+import * as fs from "fs";
+import * as path from "path";
 import * as vscode from "vscode";
 import { Exporter } from "./exporter/exporter";
 import { FileExporter } from "./exporter/file_exporter";
@@ -43,7 +45,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }
 
     // Register chat view
-    const provider = new ChatViewProvider(context.extensionUri, accessToken);
+    const provider = new ChatViewProvider(context.extensionUri, accessToken, username);
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(
             ChatViewProvider.viewType,
@@ -52,7 +54,7 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     vscode.window.showInformationMessage(
-        `Telemetry logging to a local file is enabled for research purposes.`
+        `Logging of events is enabled for research purposes.`
     );
 
     output.appendLine(`Fully activated Tutor extension`);
@@ -65,10 +67,10 @@ export async function deactivate() {
 async function setupSession() {
     let session: vscode.AuthenticationSession | undefined | null = null;
     try {
-        session = await vscode.authentication.getSession(
-            "github",
-            ["read:user", "user:email"]
-        );
+        session = await vscode.authentication.getSession("github", [
+            "read:user",
+            "user:email",
+        ]);
     } catch (error) {
         output.appendLine("Error during authentication: " + error);
     }
@@ -118,6 +120,12 @@ async function setupSession() {
     };
 }
 
+type ChatMessage = {
+    message: string;
+    isUserMessage: boolean;
+    timestamp: string;
+};
+
 class ChatViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = "tutor.chat";
 
@@ -125,7 +133,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
-        private readonly accessToken: string | null
+        private readonly accessToken: string | null,
+        private readonly username: string
     ) {}
 
     public resolveWebviewView(
@@ -146,11 +155,20 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
         webviewView.webview.onDidReceiveMessage(async (message) => {
             switch (message.command) {
-                case "getResponse":
+                case "sendMessage":
+                    this.saveMessageToFile(message.text, true);
                     const response = await this.getResponse(message.text);
                     webviewView.webview.postMessage({
                         command: "response",
                         text: response,
+                    });
+                    break;
+
+                case "loadConversation":
+                    const conversation = this.loadConversationFromFile();
+                    webviewView.webview.postMessage({
+                        command: "loadConversation",
+                        conversation: conversation,
                     });
                     break;
             }
@@ -170,15 +188,53 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
             output.appendLine(`Response: ${response}`);
 
             if (!response.ok) {
-                throw new Error("Token verification failed");
+                throw new Error(response.statusText);
             }
 
             const data = (await response.json()) as any;
-            return data.chatResponse;
+            const chatResponse = data.chatResponse;
+            this.saveMessageToFile(chatResponse, false);
+            return chatResponse;
         } catch (error) {
             console.error("Error:", error);
             return "An error occurred: " + error;
         }
+    }
+
+    private saveMessageToFile(message: string, isUserMessage: boolean) {
+        const chatFilePath = this.getChatFilePath();
+        let chatData: ChatMessage[] = [];
+        if (fs.existsSync(chatFilePath)) {
+            chatData = JSON.parse(fs.readFileSync(chatFilePath, "utf-8"));
+        }
+        chatData.push({
+            message: message,
+            isUserMessage: isUserMessage,
+            timestamp: new Date().toISOString(),
+        });
+        fs.writeFileSync(chatFilePath, JSON.stringify(chatData, null, 2));
+    }
+
+    private loadConversationFromFile(): ChatMessage[] {
+        const chatFilePath = this.getChatFilePath();
+        if (fs.existsSync(chatFilePath)) {
+            return JSON.parse(fs.readFileSync(chatFilePath, "utf-8"));
+        }
+        return [];
+    }
+
+    private getChatFilePath(): string {
+        const telemetryDir = path.join(
+            vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || "",
+            ".data",
+            this.username,
+            vscode.env.machineId,
+            vscode.env.sessionId
+        );
+        if (!fs.existsSync(telemetryDir)) {
+            fs.mkdirSync(telemetryDir, { recursive: true });
+        }
+        return path.join(telemetryDir, "chat.json");
     }
 
     private _getHtmlForWebview(webview: vscode.Webview) {
