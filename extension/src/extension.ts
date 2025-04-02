@@ -54,7 +54,7 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     vscode.window.showInformationMessage(
-        `Logging of events is enabled for research purposes.`
+        `Click the chat icon in the left sidebar to open the chat. Event logging is enabled for research purposes.`
     );
 
     output.appendLine(`Fully activated Tutor extension`);
