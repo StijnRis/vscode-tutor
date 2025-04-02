@@ -1,8 +1,7 @@
-
 var express = require("express");
 var axios = require("axios");
 var bodyParser = require("body-parser");
-const marked = require('marked');
+const marked = require("marked");
 var router = express.Router();
 
 router.use(express.json());
@@ -39,12 +38,12 @@ router.post("/message", async (req, res) => {
     const emails = await emailResponse.json();
     const primaryEmail = emails.find((email) => email.primary).email;
 
-    const allowedEmails = process.env.ALLOWED_EMAILS.split(',');
-    const allowedEmailDomains = process.env.ALLOWED_EMAIL_DOMAINS.split(',');
+    const allowedEmails = process.env.ALLOWED_EMAILS.split(",");
+    const allowedEmailDomains = process.env.ALLOWED_EMAIL_DOMAINS.split(",");
     if (
         !(
             allowedEmails.includes(primaryEmail) ||
-            allowedEmailDomains.some(domain => primaryEmail.endsWith(domain))
+            allowedEmailDomains.some((domain) => primaryEmail.endsWith(domain))
         )
     ) {
         res.status(401).send({ message: "Unauthorized email" });
