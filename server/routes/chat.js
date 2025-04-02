@@ -2,64 +2,112 @@ var express = require("express");
 var axios = require("axios");
 var bodyParser = require("body-parser");
 const marked = require("marked");
+const NodeCache = require("node-cache");
 var router = express.Router();
 
 router.use(express.json());
 
-router.post("/message", async (req, res) => {
-    if (!req.headers.authorization) {
+const authToEmailCache = new NodeCache({ stdTTL: 60 * 60 }); // Cache for 1 hour
+
+async function addEmail(req, res, next) {
+    const authorization = req.headers.authorization;
+
+    if (!authorization) {
         res.status(401).send({ message: "Unauthorized" });
         return;
     }
 
-    const authorization = req.headers.authorization;
-    const response = await fetch("https://api.github.com/user", {
-        headers: {
-            Authorization: authorization,
-        },
-    });
-
-    if (!response.ok) {
-        res.status(401).send({ message: "Token verification failed" });
-        return;
+    // Check cache
+    const cachedEmail = authToEmailCache.get(authorization);
+    if (cachedEmail) {
+        req.userEmail = cachedEmail;
+        return next();
     }
 
-    const emailResponse = await fetch("https://api.github.com/user/emails", {
-        headers: {
-            Authorization: authorization,
-        },
-    });
+    console.log("Fetching email from GitHub API");
 
-    if (!emailResponse.ok) {
-        res.status(401).send({ message: "Failed to fetch email" });
-        return;
+    try {
+        const userResponse = await fetch("https://api.github.com/user", {
+            headers: { Authorization: authorization },
+        });
+
+        if (!userResponse.ok) {
+            res.status(401).send({ message: "Token verification failed" });
+            return;
+        }
+
+        const emailResponse = await fetch("https://api.github.com/user/emails", {
+            headers: { Authorization: authorization },
+        });
+
+        if (!emailResponse.ok) {
+            res.status(401).send({ message: "Failed to fetch email" });
+            return;
+        }
+
+        const emails = await emailResponse.json();
+        const primaryEmail = emails.find((email) => email.primary).email;
+
+        authToEmailCache.set(authorization, primaryEmail);
+        req.userEmail = primaryEmail;
+        return next();
+    } catch (error) {
+        console.error("Authentication error:", error);
+        res.status(500).send({ message: "Internal server error" });
     }
+}
 
-    const emails = await emailResponse.json();
-    const primaryEmail = emails.find((email) => email.primary).email;
+router.use(addEmail);
+
+
+function addIsEmailAllowed(req, res, next) {
+    const email = req.userEmail;
 
     const allowedEmails = process.env.ALLOWED_EMAILS.split(",");
     const allowedEmailDomains = process.env.ALLOWED_EMAIL_DOMAINS.split(",");
-    if (
-        !(
-            allowedEmails.includes(primaryEmail) ||
-            allowedEmailDomains.some((domain) => primaryEmail.endsWith(domain))
-        )
-    ) {
-        res.status(401).send({ message: "Unauthorized email" });
+
+    if (!(
+        allowedEmails.includes(email) ||
+        allowedEmailDomains.some((domain) => email.endsWith(domain))
+    )) {
+        console.log("Email not allowed:", email);
+        res.status(403).send({ message: "Email not allowed" });
         return;
     }
+    
+    return next();
+}
 
+router.use(addIsEmailAllowed);
+
+
+router.post("/message", async (req, res) => {
     const { message } = req.body;
 
-    const chat_response = await getChatResponse(message);
+    if (!message) {
+        return res.status(400).send({ message: "Message is required" });
+    }
 
-    const htmlContent = marked.parse(chat_response);
+    if (typeof message !== "string") {
+        return res.status(400).send({ message: "Message must be a string" });
+    }
 
-    res.status(200).send({
-        message: "Token verification successful",
-        chatResponse: htmlContent,
-    });
+    if (message.trim() === "") {
+        return res.status(400).send({ message: "Message must be a non-empty string" });
+    }
+
+    try {
+        const chat_response = await getChatResponse(message);
+        const htmlContent = marked.parse(chat_response);
+
+        res.status(200).send({
+            message: "success",
+            chatResponse: htmlContent,
+        });
+    } catch (error) {
+        console.error("Error processing chat message:", error);
+        res.status(500).send({ message: "Internal server error" });
+    }
 });
 
 async function getChatResponse(question) {

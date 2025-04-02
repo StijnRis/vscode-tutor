@@ -159,7 +159,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
     private async getResponse(message: string): Promise<string> {
         try {
-            const response = await fetch("http://localhost:3000/chat/message", {
+            const response = await fetch("http://localhost:8501/chat/message", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
