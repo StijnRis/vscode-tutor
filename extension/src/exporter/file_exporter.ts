@@ -23,9 +23,9 @@ export class FileExporter implements Exporter {
         
         if (!fs.existsSync(dirPath)) {
             fs.mkdirSync(dirPath, { recursive: true });
-            output.appendLine(`Created session file at: ${dirPath}`);
+            output.appendLine(`Created session folder at: ${dirPath}`);
         } else {
-            output.appendLine(`Session file already exists at: ${dirPath}`);
+            output.appendLine(`Session folder already exists at: ${dirPath}`);
         }
 
         const filePath = path.join(dirPath, "telemetry.json");
@@ -41,7 +41,5 @@ export class FileExporter implements Exporter {
 
     export(event: TutorEvent) {
         fs.appendFileSync(this.filePath, JSON.stringify(event, null, 2) + ",\n");
-
-        this.output.appendLine(`Exported event to: ${this.filePath}`);
     }
 }

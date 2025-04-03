@@ -18,7 +18,7 @@ To get started with the Tutor extension, follow these steps:
 1. **Install the Extension**  
     Open Visual Studio Code, go to the Extensions view by clicking on the Extensions icon in the Activity Bar on the side of the window, and search for "Tutor". Click "Install" to add the extension to your editor.
 
-2. **Login through github**
+2. **Login through github**  
     After enabling the extension, you will be prompted to log in using your GitHub account. This step is necessary to authenticate the chatbot and retrieve your email address for secure access. Follow the on-screen instructions to complete the login process.
 
 3. **Open the Chat View**  

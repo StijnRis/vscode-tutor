@@ -45,7 +45,12 @@ export async function activate(context: vscode.ExtensionContext) {
     }
 
     // Register chat view
-    const provider = new ChatViewProvider(context.extensionUri, accessToken, username);
+    const provider = new ChatViewProvider(
+        context.extensionUri,
+        accessToken,
+        username,
+        output
+    );
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(
             ChatViewProvider.viewType,
@@ -54,7 +59,8 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     vscode.window.showInformationMessage(
-        `Click the chat icon in the left sidebar to open the chat. Event logging is enabled for research purposes.`
+        `Click the chat icon in the left sidebar to open the chat.\n\nEvent logging is enabled for research purposes.`,
+        { modal: true }
     );
 
     output.appendLine(`Fully activated Tutor extension`);
@@ -134,7 +140,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     constructor(
         private readonly _extensionUri: vscode.Uri,
         private readonly accessToken: string | null,
-        private readonly username: string
+        private readonly username: string,
+        private readonly output: vscode.OutputChannel
     ) {}
 
     public resolveWebviewView(
@@ -157,7 +164,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
             switch (message.command) {
                 case "sendMessage":
                     this.saveMessageToFile(message.text, true);
-                    const response = await this.getResponse(message.text);
+                    const response = await this.getResponseToLatestMessage();
+                    this.saveMessageToFile(response, false);
                     webviewView.webview.postMessage({
                         command: "response",
                         text: response,
@@ -175,29 +183,46 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         });
     }
 
-    private async getResponse(message: string): Promise<string> {
+    private async getResponseToLatestMessage(): Promise<string> {
         try {
-            const response = await fetch("http://localhost:8501/chat/message", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${this.accessToken}`,
-                },
-                body: JSON.stringify({ message: message }),
-            });
-            output.appendLine(`Response: ${response}`);
+            const conversation = this.loadConversationFromFile();
+            const messages = [];
+            for (const message of conversation) {
+                if (message.isUserMessage) {
+                    messages.push({ role: "user", content: message.message });
+                } else {
+                    messages.push({
+                        role: "assistant",
+                        content: message.message,
+                    });
+                }
+            }
+
+            const response = await fetch(
+                // "https://python-stanislas.ewi.tudelft.nl/vs-tutor/tutor/message",
+                "http://localhost:8501/tutor/message",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${this.accessToken}`,
+                    },
+                    body: JSON.stringify({ messages: messages }),
+                }
+            );
 
             if (!response.ok) {
                 throw new Error(response.statusText);
             }
 
+            this.output.appendLine(`Chat response: ${response}`);
+
             const data = (await response.json()) as any;
             const chatResponse = data.chatResponse;
-            this.saveMessageToFile(chatResponse, false);
             return chatResponse;
         } catch (error) {
-            console.error("Error:", error);
-            return "An error occurred: " + error;
+            this.output.appendLine(`Chat response error: ${error}`);
+            return `An error occurred: ${error}`;
         }
     }
 

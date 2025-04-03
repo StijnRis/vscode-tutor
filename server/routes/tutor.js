@@ -4,6 +4,7 @@ var bodyParser = require("body-parser");
 const marked = require("marked");
 const NodeCache = require("node-cache");
 var router = express.Router();
+const fs = require("fs");
 
 router.use(express.json());
 
@@ -36,9 +37,12 @@ async function addEmail(req, res, next) {
             return;
         }
 
-        const emailResponse = await fetch("https://api.github.com/user/emails", {
-            headers: { Authorization: authorization },
-        });
+        const emailResponse = await fetch(
+            "https://api.github.com/user/emails",
+            {
+                headers: { Authorization: authorization },
+            }
+        );
 
         if (!emailResponse.ok) {
             res.status(401).send({ message: "Failed to fetch email" });
@@ -59,45 +63,51 @@ async function addEmail(req, res, next) {
 
 router.use(addEmail);
 
-
 function addIsEmailAllowed(req, res, next) {
     const email = req.userEmail;
 
     const allowedEmails = process.env.ALLOWED_EMAILS.split(",");
     const allowedEmailDomains = process.env.ALLOWED_EMAIL_DOMAINS.split(",");
 
-    if (!(
-        allowedEmails.includes(email) ||
-        allowedEmailDomains.some((domain) => email.endsWith(domain))
-    )) {
+    if (
+        !(
+            allowedEmails.includes(email) ||
+            allowedEmailDomains.some((domain) => email.endsWith(domain))
+        )
+    ) {
         console.log("Email not allowed:", email);
         res.status(403).send({ message: "Email not allowed" });
         return;
     }
-    
+
     return next();
 }
 
 router.use(addIsEmailAllowed);
 
-
 router.post("/message", async (req, res) => {
-    const { message } = req.body;
+    const { messages } = req.body;
 
-    if (!message) {
-        return res.status(400).send({ message: "Message is required" });
+    if (!messages) {
+        return res.status(400).send({ message: "Messages are required" });
     }
 
-    if (typeof message !== "string") {
-        return res.status(400).send({ message: "Message must be a string" });
+    if (!Array.isArray(messages)) {
+        return res.status(400).send({ message: "Messages must be an array" });
     }
 
-    if (message.trim() === "") {
-        return res.status(400).send({ message: "Message must be a non-empty string" });
+    const invalidMessage = messages.find((msg) => !msg.role || !msg.content);
+    if (invalidMessage) {
+        return res
+            .status(400)
+            .send({
+                message:
+                    "Each message must have 'role' and 'content' properties",
+            });
     }
 
     try {
-        const chat_response = await getChatResponse(message);
+        const chat_response = await getChatResponse(messages);
         const htmlContent = marked.parse(chat_response);
 
         res.status(200).send({
@@ -110,7 +120,9 @@ router.post("/message", async (req, res) => {
     }
 });
 
-async function getChatResponse(question) {
+const systemPrompt = fs.readFileSync("prompt.txt", "utf8");
+
+async function getChatResponse(messages) {
     const server = process.env.OPEN_WEB_UI_SERVER;
     if (!server) {
         throw new Error("OPEN_WEB_UI_SERVER is not set");
@@ -127,9 +139,11 @@ async function getChatResponse(question) {
         "Content-Type": "application/json",
     };
 
+    messages.unshift({ role: "system", content: systemPrompt });
+
     const data = {
         model: "llama3.2:latest",
-        messages: [{ role: "user", content: question }],
+        messages: messages,
     };
 
     try {
