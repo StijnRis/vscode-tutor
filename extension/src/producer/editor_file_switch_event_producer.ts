@@ -3,7 +3,7 @@ import { Exporter } from "../exporter/exporter";
 import { isInDataDirectory } from "../extension";
 import { TutorEvent } from "../tutor_event";
 
-export class DocumentSaveEventProducer {
+export class EditorFileSwitchEventProducer {
     private output: vscode.OutputChannel;
     private exporters: Exporter[];
     private githubUsername: string;
@@ -16,8 +16,10 @@ export class DocumentSaveEventProducer {
 
     listen(context: vscode.ExtensionContext) {
         context.subscriptions.push(
-            vscode.workspace.onDidSaveTextDocument(async (event) => {
-                this.documentSaveEventHandler(event);
+            vscode.window.onDidChangeActiveTextEditor((editor) => {
+                if (editor) {
+                    this.editorFileSwitchEventHandler(editor.document);
+                }
             })
         );
     }
@@ -26,7 +28,7 @@ export class DocumentSaveEventProducer {
         this.exporters.push(exporter);
     }
 
-    async documentSaveEventHandler(document: vscode.TextDocument) {
+    async editorFileSwitchEventHandler(document: vscode.TextDocument) {
         if (isInDataDirectory(document.fileName)) {
             this.output.appendLine(
                 `Skipping event for file in .data directory: ${document.fileName}`
@@ -34,17 +36,16 @@ export class DocumentSaveEventProducer {
             return;
         }
 
-        this.output.appendLine(`Event: Document saved: ${document.fileName}`);
+        this.output.appendLine(`Event: Switched to file: ${document.fileName}`);
 
         const data: TutorEvent = {
-            eventType: "document_save",
+            eventType: "editor_file_switch",
             timestamp: new Date().toISOString(),
             sessionId: vscode.env.sessionId,
             machineId: vscode.env.machineId,
             githubUsername: this.githubUsername,
             data: {
                 documentPath: document.fileName,
-                documentText: document.getText(),
             },
         };
 

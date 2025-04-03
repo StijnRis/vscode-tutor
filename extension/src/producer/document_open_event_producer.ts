@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { Exporter } from "../exporter/exporter";
+import { isInDataDirectory } from "../extension";
 import { TutorEvent } from "../tutor_event";
 
 export class DocumentOpenEventProducer {
@@ -26,7 +27,14 @@ export class DocumentOpenEventProducer {
     }
 
     async documentOpenEventHandler(document: vscode.TextDocument) {
-        this.output.appendLine(`Document opened: ${document.fileName}`);
+        if (isInDataDirectory(document.fileName)) {
+            this.output.appendLine(
+                `Skipping event for file in .data directory: ${document.fileName}`
+            );
+            return;
+        }
+
+        this.output.appendLine(`Event: Document opened: ${document.fileName}`);
 
         const data: TutorEvent = {
             eventType: "document_open",

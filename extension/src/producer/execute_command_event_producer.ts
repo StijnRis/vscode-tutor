@@ -31,7 +31,7 @@ export class ExecuteCommandEventProducer {
         const terminal = event.terminal;
         const command = event.execution.commandLine.value;
         this.output.appendLine(
-            `Saving execution of terminal '${terminal.name}' with command: ${command}`
+            `Event: Terminal '${terminal.name}' executed ${command}`
         );
 
         let result = "";
@@ -46,7 +46,6 @@ export class ExecuteCommandEventProducer {
                       .replace(/\r?\n|\r/g, "")
                       .slice(-7)}`
                 : result.replace(/\r?\n|\r/g, "");
-        this.output.appendLine(`Terminal output found: '${shortenedResult}'`);
 
         const data: TutorEvent = {
             eventType: "execution",

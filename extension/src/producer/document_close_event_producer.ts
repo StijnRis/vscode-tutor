@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { Exporter } from "../exporter/exporter";
+import { isInDataDirectory } from "../extension";
 import { TutorEvent } from "../tutor_event";
 
 export class DocumentCloseEventProducer {
@@ -26,7 +27,14 @@ export class DocumentCloseEventProducer {
     }
 
     async documentCloseEventHandler(document: vscode.TextDocument) {
-        this.output.appendLine(`Document closed: ${document.fileName}`);
+        if (isInDataDirectory(document.fileName)) {
+            this.output.appendLine(
+                `Skipping event for file in .data directory: ${document.fileName}`
+            );
+            return;
+        }
+
+        this.output.appendLine(`Event: Document closed: ${document.fileName}`);
 
         const data: TutorEvent = {
             eventType: "document_close",
@@ -36,7 +44,6 @@ export class DocumentCloseEventProducer {
             githubUsername: this.githubUsername,
             data: {
                 documentPath: document.fileName,
-                documentText: document.getText(),
             },
         };
 

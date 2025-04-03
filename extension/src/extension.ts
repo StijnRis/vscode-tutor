@@ -6,8 +6,10 @@ import { FileExporter } from "./exporter/file_exporter";
 import { DocumentCloseEventProducer } from "./producer/document_close_event_producer";
 import { DocumentOpenEventProducer } from "./producer/document_open_event_producer";
 import { DocumentSaveEventProducer } from "./producer/document_save_event_producer";
+import { EditorFileSwitchEventProducer } from "./producer/editor_file_switch_event_producer";
 import { EventProducer } from "./producer/event_producer";
 import { ExecuteCommandEventProducer } from "./producer/execute_command_event_producer";
+import { FileSystemEventProducer } from "./producer/file_system_event_producer";
 
 const output = vscode.window.createOutputChannel("Tutor");
 
@@ -27,6 +29,8 @@ export async function activate(context: vscode.ExtensionContext) {
     producers.push(new DocumentCloseEventProducer(output, username));
     producers.push(new DocumentOpenEventProducer(output, username));
     producers.push(new DocumentSaveEventProducer(output, username));
+    producers.push(new EditorFileSwitchEventProducer(output, username));
+    producers.push(new FileSystemEventProducer(output, username));
 
     // Create exporters
     const exporters: Exporter[] = [];
@@ -126,6 +130,14 @@ async function setupSession() {
     };
 }
 
+export function isInDataDirectory(filePath: string): boolean {
+    const dataDir = path.join(
+        vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || "",
+        ".data"
+    );
+    return filePath.startsWith(dataDir);
+}
+
 type ChatMessage = {
     message: string;
     isUserMessage: boolean;
@@ -199,8 +211,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
             }
 
             const response = await fetch(
-                // "https://python-stanislas.ewi.tudelft.nl/vs-tutor/tutor/message",
-                "http://localhost:8501/tutor/message",
+                "https://python-stanislas.ewi.tudelft.nl/vs-tutor/tutor/message",
+                // "http://localhost:8501/tutor/message",
                 {
                     method: "POST",
                     headers: {
