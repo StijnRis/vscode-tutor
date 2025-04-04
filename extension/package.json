@@ -2,7 +2,7 @@
     "name": "tutor",
     "displayName": "Tutor",
     "description": "A tutor that helps you learn programming and making projects.",
-    "version": "0.3.6",
+    "version": "0.3.7",
     "publisher": "vscodeTutor",
     "engines": {
         "vscode": "^1.98.0"
