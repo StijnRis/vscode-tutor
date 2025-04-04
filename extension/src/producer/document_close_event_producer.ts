@@ -37,7 +37,7 @@ export class DocumentCloseEventProducer {
         this.output.appendLine(`Event: Document closed: ${document.fileName}`);
 
         const data: TutorEvent = {
-            eventType: "document_close",
+            eventType: "documentClose",
             timestamp: new Date().toISOString(),
             sessionId: vscode.env.sessionId,
             machineId: vscode.env.machineId,

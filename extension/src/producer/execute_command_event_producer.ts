@@ -28,6 +28,8 @@ export class ExecuteCommandEventProducer {
     async executionEventHandler(
         event: vscode.TerminalShellExecutionStartEvent
     ) {
+        const startTime = new Date();
+
         const terminal = event.terminal;
         const command = event.execution.commandLine.value;
         this.output.appendLine(
@@ -40,12 +42,8 @@ export class ExecuteCommandEventProducer {
             result += data;
         }
 
-        const shortenedResult =
-            result.replace(/\r?\n|\r/g, "").length > 14
-                ? `${result.replace(/\r?\n|\r/g, "").slice(0, 7)}...${result
-                      .replace(/\r?\n|\r/g, "")
-                      .slice(-7)}`
-                : result.replace(/\r?\n|\r/g, "");
+        const endTime = new Date();
+        const duration = endTime.getTime() - startTime.getTime();
 
         const data: TutorEvent = {
             eventType: "execution",
@@ -56,6 +54,7 @@ export class ExecuteCommandEventProducer {
             data: {
                 exitStatus: event.terminal.exitStatus,
                 command: command,
+                durationMs: duration,
                 result: result,
             },
         };

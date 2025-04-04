@@ -1,48 +1,37 @@
 import * as vscode from "vscode";
+import { TutorEvent } from "../tutor_event";
 import { Exporter } from "./exporter";
 
-import { TutorEvent } from "../tutor_event";
-
 export class RemoteExporter implements Exporter {
-    private url: string;
-    private output: vscode.OutputChannel;
-    private username: string;
+    constructor(
+        private readonly endpoint: string,
+        private readonly accessToken: string | null,
+        private readonly username: string,
+        private readonly output: vscode.OutputChannel
+    ) {}
 
-
-    constructor(url: string, username: string, output: vscode.OutputChannel) {
-        output.appendLine(`Exporting data to url: ${url}`);
-        this.url = url;
-        this.output = output;
-        this.username = username;
-    }
-
-    export(event: TutorEvent) {
+    public async export(event: TutorEvent): Promise<void> {
         const data = {
             username: this.username,
-            machineId: vscode.env.machineId,
-            sessionId: vscode.env.sessionId,
             event: event,
-        }
-        const options = {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify(data),
         };
-
-        fetch(this.url, options)
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error(`Network response was not ok ${response.statusText}`);
-                }
-                return response.json();
-            })
-            .then((data) => {
-                this.output.appendLine(`Data exported successfully`);
-            })
-            .catch((error) => {
-                this.output.appendLine(`Error exporting data`);
+        try {
+            const response = await fetch(this.endpoint, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${this.accessToken}`,
+                },
+                body: JSON.stringify(data),
             });
+
+            if (!response.ok) {
+                throw new Error(
+                    `Failed to export event. Status: ${response.status}, Message: ${response.statusText}`
+                );
+            }
+        } catch (error) {
+            this.output.appendLine(`Error exporting event: ${error}`);
+        }
     }
 }

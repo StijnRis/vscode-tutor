@@ -1,8 +1,9 @@
-import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
+import { ConsoleExporter } from "./exporter/console_exporter";
 import { Exporter } from "./exporter/exporter";
 import { FileExporter } from "./exporter/file_exporter";
+import { ChatEventProducer } from "./producer/chat_event_producer";
 import { DocumentCloseEventProducer } from "./producer/document_close_event_producer";
 import { DocumentOpenEventProducer } from "./producer/document_open_event_producer";
 import { DocumentSaveEventProducer } from "./producer/document_save_event_producer";
@@ -10,7 +11,10 @@ import { EditorFileSwitchEventProducer } from "./producer/editor_file_switch_eve
 import { EventProducer } from "./producer/event_producer";
 import { ExecuteCommandEventProducer } from "./producer/execute_command_event_producer";
 import { FileSystemEventProducer } from "./producer/file_system_event_producer";
+import { RemoteExporter } from "./exporter/remote_exporter";
 
+const baseUrl = "https://python-stanislas.ewi.tudelft.nl/vs-tutor";
+// const baseUrl = "http://localhost:8501";
 const output = vscode.window.createOutputChannel("Tutor");
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -31,10 +35,13 @@ export async function activate(context: vscode.ExtensionContext) {
     producers.push(new DocumentSaveEventProducer(output, username));
     producers.push(new EditorFileSwitchEventProducer(output, username));
     producers.push(new FileSystemEventProducer(output, username));
+    producers.push(new ChatEventProducer(output, username));
 
     // Create exporters
     const exporters: Exporter[] = [];
-    exporters.push(FileExporter.create(username, output));
+    // exporters.push(FileExporter.create(username, output));
+    // exporters.push(new ConsoleExporter());
+    exporters.push(new RemoteExporter(`${baseUrl}/tutor/event`, accessToken, username, output));
 
     // Link producers and exporters
     for (const producer of producers) {
@@ -148,13 +155,16 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = "tutor.chat";
 
     private _view?: vscode.WebviewView;
+    private chatMessages: ChatMessage[] = [];
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
         private readonly accessToken: string | null,
         private readonly username: string,
         private readonly output: vscode.OutputChannel
-    ) {}
+    ) {
+        this.chatMessages = [];
+    }
 
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
@@ -175,20 +185,19 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         webviewView.webview.onDidReceiveMessage(async (message) => {
             switch (message.command) {
                 case "sendMessage":
-                    this.saveMessageToFile(message.text, true);
+                    this.saveMessageToArray(message.text, true);
                     const response = await this.getResponseToLatestMessage();
-                    this.saveMessageToFile(response, false);
+                    this.saveMessageToArray(response, false);
                     webviewView.webview.postMessage({
                         command: "response",
                         text: response,
                     });
                     break;
 
-                case "loadConversation":
-                    const conversation = this.loadConversationFromFile();
+                case "loadChatMessages":
                     webviewView.webview.postMessage({
-                        command: "loadConversation",
-                        conversation: conversation,
+                        command: "loadChatMessages",
+                        chatMessages: this.chatMessages,
                     });
                     break;
             }
@@ -197,9 +206,8 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
     private async getResponseToLatestMessage(): Promise<string> {
         try {
-            const conversation = this.loadConversationFromFile();
             const messages = [];
-            for (const message of conversation) {
+            for (const message of this.chatMessages) {
                 if (message.isUserMessage) {
                     messages.push({ role: "user", content: message.message });
                 } else {
@@ -211,8 +219,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
             }
 
             const response = await fetch(
-                "https://python-stanislas.ewi.tudelft.nl/vs-tutor/tutor/message",
-                // "http://localhost:8501/tutor/message",
+                `${baseUrl}/tutor/message`,
                 {
                     method: "POST",
                     headers: {
@@ -227,8 +234,6 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
                 throw new Error(response.statusText);
             }
 
-            this.output.appendLine(`Chat response: ${response}`);
-
             const data = (await response.json()) as any;
             const chatResponse = data.chatResponse;
             return chatResponse;
@@ -238,40 +243,17 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    private saveMessageToFile(message: string, isUserMessage: boolean) {
-        const chatFilePath = this.getChatFilePath();
-        let chatData: ChatMessage[] = [];
-        if (fs.existsSync(chatFilePath)) {
-            chatData = JSON.parse(fs.readFileSync(chatFilePath, "utf-8"));
-        }
-        chatData.push({
+    private saveMessageToArray(message: string, isUserMessage: boolean) {
+        this.chatMessages.push({
             message: message,
             isUserMessage: isUserMessage,
             timestamp: new Date().toISOString(),
         });
-        fs.writeFileSync(chatFilePath, JSON.stringify(chatData, null, 2));
-    }
-
-    private loadConversationFromFile(): ChatMessage[] {
-        const chatFilePath = this.getChatFilePath();
-        if (fs.existsSync(chatFilePath)) {
-            return JSON.parse(fs.readFileSync(chatFilePath, "utf-8"));
-        }
-        return [];
-    }
-
-    private getChatFilePath(): string {
-        const telemetryDir = path.join(
-            vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || "",
-            ".data",
-            this.username,
-            vscode.env.machineId,
-            vscode.env.sessionId
-        );
-        if (!fs.existsSync(telemetryDir)) {
-            fs.mkdirSync(telemetryDir, { recursive: true });
-        }
-        return path.join(telemetryDir, "chat.json");
+        vscode.commands.executeCommand("tutor.chatMessage", {
+            message,
+            isUserMessage,
+            timestamp: new Date().toISOString(),
+        });
     }
 
     private _getHtmlForWebview(webview: vscode.Webview) {

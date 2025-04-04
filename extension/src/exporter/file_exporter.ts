@@ -34,9 +34,9 @@ export class FileExporter implements Exporter {
     }
 
     constructor(filePath: string, output: vscode.OutputChannel) {
-        output.appendLine(`Exporting data to file: ${filePath}`);
         this.filePath = filePath;
         this.output = output;
+        this.output.appendLine(`Exporting data to file: ${filePath}`);
     }
 
     export(event: TutorEvent) {

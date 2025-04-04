@@ -39,7 +39,7 @@ export class EditorFileSwitchEventProducer {
         this.output.appendLine(`Event: Switched to file: ${document.fileName}`);
 
         const data: TutorEvent = {
-            eventType: "editor_file_switch",
+            eventType: "editorFileSwitch",
             timestamp: new Date().toISOString(),
             sessionId: vscode.env.sessionId,
             machineId: vscode.env.machineId,

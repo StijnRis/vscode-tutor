@@ -43,7 +43,7 @@ export class FileSystemEventProducer {
         this.output.appendLine(`Event: File created: ${uri.fsPath}`);
 
         const data: TutorEvent = {
-            eventType: "file_created",
+            eventType: "fileCreated",
             timestamp: new Date().toISOString(),
             sessionId: vscode.env.sessionId,
             machineId: vscode.env.machineId,
@@ -69,7 +69,7 @@ export class FileSystemEventProducer {
         this.output.appendLine(`Event: File deleted: ${uri.fsPath}`);
 
         const data: TutorEvent = {
-            eventType: "file_deleted",
+            eventType: "fileDeleted",
             timestamp: new Date().toISOString(),
             sessionId: vscode.env.sessionId,
             machineId: vscode.env.machineId,

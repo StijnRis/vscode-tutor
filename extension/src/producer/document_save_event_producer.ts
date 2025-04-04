@@ -34,10 +34,10 @@ export class DocumentSaveEventProducer {
             return;
         }
 
-        this.output.appendLine(`Event: Document saved: ${document.fileName}`);
+        this.output.appendLine(`Event: Saved document ${document.fileName}`);
 
         const data: TutorEvent = {
-            eventType: "document_save",
+            eventType: "documentSave",
             timestamp: new Date().toISOString(),
             sessionId: vscode.env.sessionId,
             machineId: vscode.env.machineId,

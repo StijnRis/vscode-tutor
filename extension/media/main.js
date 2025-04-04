@@ -7,8 +7,8 @@
     const messageInput = document.getElementById("message-input");
     const sendButton = document.getElementById("send-button");
 
-    // Load conversation from chat.json
-    vscode.postMessage({ command: "loadConversation" });
+    // Load chatMessages from chat.json
+    vscode.postMessage({ command: "loadChatMessages" });
 
     sendButton.addEventListener("click", () => {
         const message = messageInput.value;
@@ -40,11 +40,13 @@
 
                 break;
 
-            case "loadConversation":
-                const conversation = message.conversation || [];
-                conversation.forEach((msg) => {
+            case "loadChatMessages":
+                const chatMessages = message.chatMessages || [];
+                chatMessages.forEach((msg) => {
                     const messageElement = document.createElement("div");
-                    messageElement.className = "message " + (msg["isUserMessage"] ? "user-message" : "bot-message");
+                    messageElement.className =
+                        "message " +
+                        (msg["isUserMessage"] ? "user-message" : "bot-message");
                     let message = msg["message"];
                     if (msg["isUserMessage"]) {
                         message = "You: " + message;
@@ -56,10 +58,10 @@
         }
     });
 
-    document.addEventListener("DOMContentLoaded", function() {
+    document.addEventListener("DOMContentLoaded", function () {
         const textarea = document.getElementById("message-input");
-    
-        textarea.addEventListener("input", function() {
+
+        textarea.addEventListener("input", function () {
             this.style.height = "auto"; // Reset height to recalculate
             this.style.height = Math.min(this.scrollHeight, 200) + "px"; // Adjust height based on scroll height
         });

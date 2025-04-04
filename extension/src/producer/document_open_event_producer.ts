@@ -26,7 +26,7 @@ export class DocumentOpenEventProducer {
         this.exporters.push(exporter);
     }
 
-    async documentOpenEventHandler(document: vscode.TextDocument) {
+    private async documentOpenEventHandler(document: vscode.TextDocument) {
         if (isInDataDirectory(document.fileName)) {
             this.output.appendLine(
                 `Skipping event for file in .data directory: ${document.fileName}`
@@ -37,7 +37,7 @@ export class DocumentOpenEventProducer {
         this.output.appendLine(`Event: Document opened: ${document.fileName}`);
 
         const data: TutorEvent = {
-            eventType: "document_open",
+            eventType: "documentOpen",
             timestamp: new Date().toISOString(),
             sessionId: vscode.env.sessionId,
             machineId: vscode.env.machineId,

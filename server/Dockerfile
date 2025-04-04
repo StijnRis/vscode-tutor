@@ -25,11 +25,17 @@ RUN --mount=type=bind,source=package.json,target=package.json \
     --mount=type=cache,target=/root/.npm \
     npm ci --omit=dev
 
+
 # Run the application as a non-root user.
 USER node
 
 # Copy the rest of the source files into the image.
 COPY . .
+
+# Setup data folder permissions
+USER root
+RUN mkdir -p /data && chown -R node:node /data && chmod -R u+w /data
+USER node
 
 # Expose the port that the application listens on.
 EXPOSE 8501

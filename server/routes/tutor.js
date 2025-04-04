@@ -5,6 +5,7 @@ const marked = require("marked");
 const NodeCache = require("node-cache");
 var router = express.Router();
 const fs = require("fs");
+const path = require("path");
 
 router.use(express.json());
 
@@ -98,12 +99,9 @@ router.post("/message", async (req, res) => {
 
     const invalidMessage = messages.find((msg) => !msg.role || !msg.content);
     if (invalidMessage) {
-        return res
-            .status(400)
-            .send({
-                message:
-                    "Each message must have 'role' and 'content' properties",
-            });
+        return res.status(400).send({
+            message: "Each message must have 'role' and 'content' properties",
+        });
     }
 
     try {
@@ -156,5 +154,32 @@ async function getChatResponse(messages) {
         throw error;
     }
 }
+
+router.post("/event", (req, res) => {
+    const { username, event } = req.body;
+    if (!username || !event) {
+        return res
+            .status(400)
+            .send({ message: "Username and event are required" });
+    }
+
+    const isDocker = fs.existsSync("/.dockerenv");
+    const baseDir = isDocker ? "/data" : path.join(__dirname, "../data");
+    const userDir = path.join(baseDir, username);
+    const logFile = path.join(userDir, "logs.json");
+
+    try {
+        if (!fs.existsSync(userDir)) {
+            fs.mkdirSync(userDir, { recursive: true });
+        }
+
+        fs.appendFileSync(logFile, JSON.stringify(event) + "\n");
+    } catch (error) {
+        console.error("Error appending to log file:", error);
+        return res.status(500).send({ message: "Internal server error" });
+    }
+
+    res.status(200).send({ message: "Event received" });
+});
 
 module.exports = router;
