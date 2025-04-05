@@ -140,7 +140,7 @@ async function getChatResponse(messages) {
     messages.unshift({ role: "system", content: systemPrompt });
 
     const data = {
-        model: "llama3.2:latest",
+        model: "gemma3:27b",
         messages: messages,
     };
 
