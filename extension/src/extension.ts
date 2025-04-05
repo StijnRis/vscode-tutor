@@ -1,8 +1,7 @@
 import * as path from "path";
 import * as vscode from "vscode";
-import { ConsoleExporter } from "./exporter/console_exporter";
 import { Exporter } from "./exporter/exporter";
-import { FileExporter } from "./exporter/file_exporter";
+import { RemoteExporter } from "./exporter/remote_exporter";
 import { ChatEventProducer } from "./producer/chat_event_producer";
 import { DocumentCloseEventProducer } from "./producer/document_close_event_producer";
 import { DocumentOpenEventProducer } from "./producer/document_open_event_producer";
@@ -11,7 +10,7 @@ import { EditorFileSwitchEventProducer } from "./producer/editor_file_switch_eve
 import { EventProducer } from "./producer/event_producer";
 import { ExecuteCommandEventProducer } from "./producer/execute_command_event_producer";
 import { FileSystemEventProducer } from "./producer/file_system_event_producer";
-import { RemoteExporter } from "./exporter/remote_exporter";
+import { KeystrokeEventProducer } from "./producer/keystroke_event_producer";
 
 const baseUrl = "https://python-stanislas.ewi.tudelft.nl/vs-tutor";
 // const baseUrl = "http://localhost:8501";
@@ -36,12 +35,20 @@ export async function activate(context: vscode.ExtensionContext) {
     producers.push(new EditorFileSwitchEventProducer(output, username));
     producers.push(new FileSystemEventProducer(output, username));
     producers.push(new ChatEventProducer(output, username));
+    producers.push(new KeystrokeEventProducer(output, username));
 
     // Create exporters
     const exporters: Exporter[] = [];
     // exporters.push(FileExporter.create(username, output));
     // exporters.push(new ConsoleExporter());
-    exporters.push(new RemoteExporter(`${baseUrl}/tutor/event`, accessToken, username, output));
+    exporters.push(
+        new RemoteExporter(
+            `${baseUrl}/tutor/event`,
+            accessToken,
+            username,
+            output
+        )
+    );
 
     // Link producers and exporters
     for (const producer of producers) {
@@ -218,17 +225,14 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
                 }
             }
 
-            const response = await fetch(
-                `${baseUrl}/tutor/message`,
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${this.accessToken}`,
-                    },
-                    body: JSON.stringify({ messages: messages }),
-                }
-            );
+            const response = await fetch(`${baseUrl}/tutor/message`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${this.accessToken}`,
+                },
+                body: JSON.stringify({ messages: messages }),
+            });
 
             if (!response.ok) {
                 throw new Error(response.statusText);
