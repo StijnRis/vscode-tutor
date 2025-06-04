@@ -23,3 +23,6 @@ To get started with the Tutor extension, follow these steps:
 
 3. **Open the Chat View**  
     Click on the chat icon located in the left sidebar to access the chat view. From there, you can start interacting with the chatbot by typing your questions or requests for guidance. The chatbot will provide informative and helpful responses to assist you.
+
+# Deployement
+run: `vsce publish minor`

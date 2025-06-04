@@ -76,10 +76,57 @@ export async function activate(context: vscode.ExtensionContext) {
         )
     );
 
-    vscode.window.showInformationMessage(
-        `Click the chat icon in the left sidebar to open the chat.\n\nEvent logging is enabled for research purposes.`,
-        { modal: true }
+    const submitted_consentform_response = await fetch(
+        `${baseUrl}/tutor/has-consent`,
+        {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+            },
+        }
     );
+    const hasConsent = ((await submitted_consentform_response.json()) as any)[
+        "hasConsent"
+    ];
+    if (hasConsent) {
+        // Show a happy cat image in a webview panel
+        const panel = vscode.window.createWebviewPanel(
+            "happyCat",
+            "Thank You! 🐱",
+            vscode.ViewColumn.Active,
+            { enableScripts: false }
+        );
+        panel.webview.html = `<!DOCTYPE html>
+            <html lang=\"en\">
+            <head>
+                <meta charset=\"UTF-8\">
+                <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+                <title>Happy Cat</title>
+                <style>
+                    body { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #fff; }
+                    img { max-width: 350px; border-radius: 16px; box-shadow: 0 2px 16px #0002; }
+                    h2 { color: #333; margin-top: 1em; }
+                    p { color: #333; }
+                </style>
+            </head>
+            <body>
+                <img src=\"https://cataas.com/cat/says/Thank%20You!%20:3\" alt=\"Happy Cat\" />
+                <h2>Thank you for submitting your consent form for period 3! If you haven't already, please also submit it for period 4 to help us continue our research. 🐾</h2>
+                <p>Click the chat icon in the left sidebar to open the chat.</p>
+                <p>Event logging is enabled for research purposes.</p>
+                <p>This file can safely be closed, it will automatically close after 30 seconds.</p>
+            </body>
+            </html>`;
+        // Automatically close the panel
+        setTimeout(() => {
+            panel.dispose();
+        }, 30000);
+    } else {
+        vscode.window.showInformationMessage(
+            `🚨 Help us improve your learning experience and support research! 🚨\n\nPlease submit your consent forms for both period 3 & 4. By participating, you contribute to valuable research and help shape the future of coding education!\n\nClick the chat icon in the left sidebar to open the chat. Event logging is enabled for research purposes.`,
+            { modal: true }
+        );
+    }
 
     output.appendLine(`Fully activated Tutor extension`);
 }

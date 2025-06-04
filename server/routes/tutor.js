@@ -182,4 +182,16 @@ router.post("/event", (req, res) => {
     res.status(200).send({ message: "Event received" });
 });
 
+router.get("/has-consent", (req, res) => {
+    const email = req.userEmail;
+
+    const consentUsernames = process.env.CONSENTFORMS_RECEIVED
+        .split(",");
+    const hasConsent = consentUsernames.some((username) =>
+        email.includes(username)
+    );
+
+    res.status(200).send({ hasConsent });
+});
+
 module.exports = router;
