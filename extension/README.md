@@ -4,6 +4,8 @@ This extension integrates a chatbot that provides assistance and guidance, simul
 
 Additionally, the extension collects telemetry data to aid in research purposes. This data helps improve the chatbot's performance and contributes to studies aimed at enhancing educational tools and user experiences. All data collection complies with privacy and ethical standards.
 
+![alt text](image.png)
+
 ## Features
 - Engage in interactive conversations with a chatbot to receive guidance and support.
 - Get detailed explanations and answers to your questions across various topics.
